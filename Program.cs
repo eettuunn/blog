@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 class Program
@@ -19,8 +20,8 @@ class Program
         Console.WriteLine("All posts:");
         var data = context.BlogPosts.Select(x => x.Title).ToList();
         Console.WriteLine(JsonSerializer.Serialize(data));
-            
-            
+
+
         Console.WriteLine("How many comments each user left:");
         //ToDo: write a query and dump the data to console
         // Expected result (format could be different, e.g. object serialized to JSON is ok):
@@ -28,12 +29,38 @@ class Program
         // Petr: 2
         // Elena: 3
 
+        var NumberOfCommentsPerUser = context.BlogComments
+            .GroupBy(bc => bc.UserName)
+            .Select(x => new
+            {
+                UserName = x.Key,
+                Count = x.Count()
+            })
+            .ToList();
+        NumberOfCommentsPerUser.ForEach(x => Console.WriteLine($"{x.UserName}: {x.Count}"));
+
         Console.WriteLine("Posts ordered by date of last comment. Result should include text of last comment:");
         //ToDo: write a query and dump the data to console
         // Expected result (format could be different, e.g. object serialized to JSON is ok):
         // Post2: '2020-03-06', '4'
         // Post1: '2020-03-05', '8'
         // Post3: '2020-02-14', '9'
+
+        var PostsOrderedByLastCommentDate = context.BlogPosts
+            .Select(bp => new
+            {
+                bp.Title,
+                LastComment = bp.Comments.OrderBy(c => c.CreatedDate)
+                    .Select(c => new
+                    {
+                        c.CreatedDate,
+                        c.Text
+                    })
+                    .LastOrDefault()
+            })
+            .OrderByDescending(pObject => pObject.LastComment.CreatedDate)
+            .ToList();
+        PostsOrderedByLastCommentDate.ForEach(x => Console.WriteLine($"{x.Title}: {x.LastComment.CreatedDate.ToShortDateString()}, {x.LastComment.Text}"));
 
 
         Console.WriteLine("How many last comments each user left:");
@@ -43,7 +70,18 @@ class Program
         // Ivan: 2
         // Petr: 1
 
-            
+        var NumberOfLastCommentsLeftByUser = context.BlogPosts
+            .Select(bp => bp.Comments.OrderBy(c => c.CreatedDate)
+                .LastOrDefault().UserName)
+            .GroupBy(user => user)
+            .Select(user => new
+            {
+                UserName = user.Key,
+                Count = user.Count()
+            })
+            .ToList();
+        NumberOfLastCommentsLeftByUser.ForEach(x => Console.WriteLine($"{x.UserName}: {x.Count}"));
+
         // Console.WriteLine(
         //     JsonSerializer.Serialize(BlogService.NumberOfCommentsPerUser(context)));
         // Console.WriteLine(
